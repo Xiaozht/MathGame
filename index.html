@@ -402,9 +402,9 @@
         // ========== 音频系统 ==========
         let audioContext = null;
         let musicEnabled = true;
-        let backgroundMusicInterval = null;
+        let backgroundMusicTimeout = null;
 
-        // 初始化 AudioContext
+        // 初始化 AudioContext - 必须在用户交互后调用
         function initAudio() {
             if (!audioContext) {
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -414,125 +414,112 @@
             }
         }
 
-        // 生成单个音符
-        function playNote(frequency, duration, type = 'sine', volume = 0.3) {
-            if (!audioContext || !musicEnabled) return;
-
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-
-            oscillator.frequency.value = frequency;
-            oscillator.type = type;
-
-            gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
-
-            oscillator.start(audioContext.currentTime);
-            oscillator.stop(audioContext.currentTime + duration);
-        }
-
-        // 播放音效集合
-        function playSoundEffect(notes) {
-            notes.forEach((note, index) => {
-                setTimeout(() => {
-                    playNote(note.freq, note.duration, note.type, note.volume);
-                }, index * note.delay);
-            });
-        }
-
-        // 音效定义
-        const sounds = {
-            // 点击按钮 - 清脆的哔声
-            click: () => playNote(880, 0.1, 'sine', 0.2),
-
-            // 正确答案 - 上行音阶
-            correct: () => {
-                playSoundEffect([
-                    { freq: 523.25, duration: 0.15, type: 'sine', volume: 0.3, delay: 0 },
-                    { freq: 659.25, duration: 0.15, type: 'sine', volume: 0.3, delay: 100 },
-                    { freq: 783.99, duration: 0.2, type: 'sine', volume: 0.3, delay: 100 },
-                    { freq: 1046.50, duration: 0.3, type: 'sine', volume: 0.3, delay: 100 }
-                ]);
-            },
-
-            // 错误答案 - 低沉的警报声
-            wrong: () => {
-                playSoundEffect([
-                    { freq: 200, duration: 0.2, type: 'sawtooth', volume: 0.2, delay: 0 },
-                    { freq: 180, duration: 0.2, type: 'sawtooth', volume: 0.2, delay: 50 },
-                    { freq: 160, duration: 0.25, type: 'sawtooth', volume: 0.2, delay: 50 }
-                ]);
-            },
-
-            // 开始游戏 - 欢快的开场音效
-            start: () => {
-                playSoundEffect([
-                    { freq: 523.25, duration: 0.1, type: 'sine', volume: 0.25, delay: 0 },
-                    { freq: 659.25, duration: 0.1, type: 'sine', volume: 0.25, delay: 80 },
-                    { freq: 783.99, duration: 0.1, type: 'sine', volume: 0.25, delay: 80 },
-                    { freq: 1046.50, duration: 0.15, type: 'sine', volume: 0.25, delay: 80 },
-                    { freq: 1318.51, duration: 0.2, type: 'sine', volume: 0.25, delay: 80 }
-                ]);
-            },
-
-            // 完成游戏 - 胜利音效
-            win: () => {
-                playSoundEffect([
-                    { freq: 523.25, duration: 0.15, type: 'sine', volume: 0.3, delay: 0 },
-                    { freq: 659.25, duration: 0.15, type: 'sine', volume: 0.3, delay: 100 },
-                    { freq: 783.99, duration: 0.15, type: 'sine', volume: 0.3, delay: 100 },
-                    { freq: 1046.50, duration: 0.15, type: 'sine', volume: 0.3, delay: 100 },
-                    { freq: 1318.51, duration: 0.15, type: 'sine', volume: 0.3, delay: 100 },
-                    { freq: 1567.98, duration: 0.3, type: 'sine', volume: 0.3, delay: 100 }
-                ]);
-            },
-
-            // 星星点亮音效
-            star: () => playNote(1318.51, 0.2, 'sine', 0.25)
-        };
-
-        // 简单的背景音乐旋律
-        const backgroundMelody = [
-            261.63, 329.63, 392.00, 329.63,
-            261.63, 329.63, 392.00, 261.63,
-            392.00, 440.00, 392.00, 349.23,
-            329.63, 293.66, 261.63, 293.66
-        ];
-
-        let melodyIndex = 0;
-
-        function playBackgroundNote() {
+        // 播放单个音符 - 简化版，确保声音能播放
+        function playTone(frequency, duration, type, volume) {
+            if (!audioContext) return;
             if (!musicEnabled) return;
-            const freq = backgroundMelody[melodyIndex];
-            // 更轻柔的背景音乐音量
-            const note = backgroundMelody[melodyIndex];
-            playNote(note, 0.6, 'sine', 0.1);
-            melodyIndex = (melodyIndex + 1) % backgroundMelody.length;
-        }
 
-        // 开始/停止背景音乐
-        function startBackgroundMusic() {
-            if (backgroundMusicInterval) return;
-            // 每 600ms 播放一个音符
-            backgroundMusicInterval = setInterval(playBackgroundNote, 600);
-        }
+            try {
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
 
-        function stopBackgroundMusic() {
-            if (backgroundMusicInterval) {
-                clearInterval(backgroundMusicInterval);
-                backgroundMusicInterval = null;
+                oscillator.type = type;
+                oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+
+                gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + duration);
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + duration);
+            } catch(e) {
+                console.log('音频播放失败:', e);
             }
         }
 
+        // ========== 音效函数 ==========
+
+        // 点击音效
+        function playClickSound() {
+            if (!audioContext) return;
+            playTone(1200, 0.05, 'sine', 0.15);
+        }
+
+        // 正确音效 - 三音和弦
+        function playCorrectSound() {
+            if (!audioContext) return;
+            // 同时播放三个音符组成和弦
+            playTone(523.25, 0.3, 'sine', 0.2);
+            playTone(659.25, 0.3, 'sine', 0.2);
+            playTone(783.99, 0.4, 'sine', 0.2);
+        }
+
+        // 错误音效 - 两个低音
+        function playWrongSound() {
+            if (!audioContext) return;
+            playTone(150, 0.25, 'sawtooth', 0.2);
+            setTimeout(() => {
+                if (audioContext) playTone(100, 0.3, 'sawtooth', 0.2);
+            }, 80);
+        }
+
+        // 开始音效
+        function playStartSound() {
+            if (!audioContext) return;
+            playTone(523.25, 0.1, 'sine', 0.25);
+            setTimeout(() => { if (audioContext) playTone(783.99, 0.1, 'sine', 0.25); }, 100);
+            setTimeout(() => { if (audioContext) playTone(1046.50, 0.3, 'sine', 0.25); }, 200);
+        }
+
+        // 胜利音效
+        function playWinSound() {
+            if (!audioContext) return;
+            playTone(523.25, 0.15, 'sine', 0.25);
+            setTimeout(() => { if (audioContext) playTone(659.25, 0.15, 'sine', 0.25); }, 120);
+            setTimeout(() => { if (audioContext) playTone(783.99, 0.15, 'sine', 0.25); }, 240);
+            setTimeout(() => { if (audioContext) playTone(1046.50, 0.2, 'sine', 0.25); }, 360);
+            setTimeout(() => { if (audioContext) playTone(1318.51, 0.25, 'sine', 0.25); }, 480);
+            setTimeout(() => { if (audioContext) playTone(1567.98, 0.5, 'sine', 0.3); }, 600);
+        }
+
+        // 星星音效
+        function playStarSound() {
+            if (!audioContext) return;
+            playTone(1567.98, 0.15, 'sine', 0.15);
+        }
+
+        // 简单背景音乐 - 单个音符循环
+        let bgNoteIndex = 0;
+        const bgNotes = [261.63, 329.63, 392, 523.25, 392, 329.63];
+        function playBackgroundNote() {
+            if (!musicEnabled) return;
+            playTone(bgNotes[bgNoteIndex], 0.3, 'sine', 0.08);
+            bgNoteIndex = (bgNoteIndex + 1) % bgNotes.length;
+
+            // 500ms 后播放下一个音符
+            backgroundMusicTimeout = setTimeout(playBackgroundNote, 500);
+        }
+
+        function stopBackgroundMusic() {
+            if (backgroundMusicTimeout) {
+                clearTimeout(backgroundMusicTimeout);
+                backgroundMusicTimeout = null;
+            }
+        }
+
+        function startBackgroundMusic() {
+            if (backgroundMusicTimeout) return;
+            bgNoteIndex = 0;
+            playBackgroundNote();
+        }
+
         // 切换音乐开关
-        document.getElementById('musicToggle').addEventListener('click', () => {
+        document.getElementById('musicToggle').addEventListener('click', function() {
             initAudio();
             musicEnabled = !musicEnabled;
-            const btn = document.getElementById('musicToggle');
-            btn.textContent = musicEnabled ? '🎵' : '🔇';
+            this.textContent = musicEnabled ? '🎵' : '🔇';
 
             if (musicEnabled && !document.getElementById('gameScreen').classList.contains('hidden')) {
                 startBackgroundMusic();
@@ -542,7 +529,7 @@
         });
 
 
-        // ========== 游戏逻辑 ============
+        // ========== 游戏逻辑 ==========
         let state = {
             score: 0,
             currentQuestion: 0,
@@ -572,7 +559,7 @@
         function initGameAudio() {
             initAudio();
             startBackgroundMusic();
-            sounds.start();
+            playStartSound();
         }
 
         let characterSelected = false;
@@ -608,7 +595,8 @@
             state.currentQuestion = 0;
             state.correctCount = 0;
             state.wrongCount = 0;
-            melodyIndex = 0;
+
+            bgNoteIndex = 0;
 
             updateDisplay();
             nextProblem();
@@ -644,11 +632,11 @@
             if (isCorrect) {
                 feedback.textContent = getRandomPraise();
                 feedback.className = 'feedback correct';
-                sounds.correct(); // 播放正确音效
+                playCorrectSound();
             } else {
                 feedback.textContent = `正确答案是 ${state.currentAnswer}`;
                 feedback.className = 'feedback wrong';
-                sounds.wrong(); // 播放错误音效
+                playWrongSound();
             }
 
             setTimeout(() => {
@@ -668,7 +656,7 @@
                 const num = btn.dataset.num;
 
                 // 点击音效
-                sounds.click();
+                playClickSound();
 
                 if (num === 'clear') {
                     input.value = '';
@@ -682,7 +670,7 @@
 
         // 确认按钮
         document.getElementById('confirmBtn').addEventListener('click', () => {
-            sounds.click(); // 按钮点击音效
+            playClickSound();
             checkAnswer();
         });
 
@@ -717,12 +705,12 @@
             // 播放星星音效
             for (let i = 0; i < 5; i++) {
                 setTimeout(() => {
-                    sounds.star();
+                    if (audioContext) playStarSound();
                 }, i * 150);
             }
 
             setTimeout(() => {
-                sounds.win(); // 播放完成音效
+                if (audioContext) playWinSound();
             }, 800);
 
             document.getElementById('gameScreen').classList.add('hidden');
@@ -757,11 +745,10 @@
         }
 
         document.getElementById('restartBtn').addEventListener('click', () => {
-            startBackgroundMusic(); // 重新开始时继续背景音乐
+            startBackgroundMusic();
             document.getElementById('endScreen').classList.add('hidden');
             document.getElementById('startScreen').classList.remove('hidden');
             document.querySelectorAll('.star').forEach(s => s.classList.remove('filled'));
-            melodyIndex = 0;
         });
 
         // 初始化
