@@ -301,10 +301,33 @@
             position: fixed;
             top: 10px;
             right: 10px;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            border: none;
+            font-size: 22px;
+            cursor: pointer;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+            transition: all 0.2s;
+        }
+
+        .music-toggle:active {
+            transform: scale(0.9);
+        }
+
+        .sound-toggle {
+            position: fixed;
+            top: 60px;
+            right: 10px;
             width: 40px;
             height: 40px;
             border-radius: 50%;
-            background: var(--primary-color);
+            background: #4ECDC4;
             border: none;
             font-size: 20px;
             cursor: pointer;
@@ -313,16 +336,19 @@
             align-items: center;
             justify-content: center;
             box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+            transition: all 0.2s;
         }
 
-        .music-toggle:active {
+        .sound-toggle:active {
             transform: scale(0.9);
         }
     </style>
 </head>
 <body>
     <!-- 音乐开关按钮 -->
-    <button class="music-toggle" id="musicToggle">🔇</button>
+    <button class="music-toggle" id="musicToggle">🎵</button>
+    <!-- 音效开关按钮 -->
+    <button class="sound-toggle" id="soundToggle">🔊</button>
 
     <div class="floating-shapes" id="shapes"></div>
 
@@ -399,137 +425,117 @@
     </div>
 
     <script>
-        // ========== 音频系统 ==========
-        let audioContext = null;
-        let musicEnabled = true;
-        let backgroundMusicTimeout = null;
+        // ===== 声音系统 =====
+        let audioCtx = null;
+        let musicOn = true;
+        let soundOn = true;
+        let bgInterval = null;
 
-        // 初始化 AudioContext - 必须在用户交互后调用
+        // 初始化音频上下文（需要用户交互）
         function initAudio() {
-            if (!audioContext) {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            if (audioContext.state === 'suspended') {
-                audioContext.resume();
+            if (!audioCtx) {
+                try {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                } catch(e) {
+                    console.log('Audio not supported');
+                }
             }
         }
 
-        // 播放单个音符 - 简化版，确保声音能播放
-        function playTone(frequency, duration, type, volume) {
-            if (!audioContext) return;
-            if (!musicEnabled) return;
-
+        // 播放一个音符
+        function beep(freq, duration, volume = 0.3) {
+            if (!soundOn || !audioCtx) return;
             try {
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.frequency.value = freq;
+                gain.gain.value = volume;
+                osc.type = 'sine';
+                const now = audioCtx.currentTime;
+                osc.start(now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+                osc.stop(now + duration);
+            } catch(e) {}
+        }
 
-                oscillator.type = type;
-                oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+        // 音效函数
+        function playClick() { beep(1000, 0.05, 0.2); }
+        function playCorrect() {
+            if (!soundOn || !audioCtx) return;
+            setTimeout(() => beep(523, 0.15, 0.25), 0);
+            setTimeout(() => beep(659, 0.15, 0.25), 80);
+            setTimeout(() => beep(784, 0.25, 0.25), 160);
+        }
+        function playWrong() {
+            if (!soundOn || !audioCtx) return;
+            beep(200, 0.2, 0.25);
+            setTimeout(() => beep(150, 0.3, 0.25), 100);
+        }
+        function playStart() {
+            if (!soundOn || !audioCtx) return;
+            setTimeout(() => beep(523, 0.1, 0.25), 0);
+            setTimeout(() => beep(659, 0.1, 0.25), 100);
+            setTimeout(() => beep(784, 0.1, 0.25), 200);
+            setTimeout(() => beep(1047, 0.3, 0.25), 300);
+        }
+        function playWin() {
+            if (!soundOn || !audioCtx) return;
+            setTimeout(() => beep(523, 0.12, 0.25), 0);
+            setTimeout(() => beep(659, 0.12, 0.25), 100);
+            setTimeout(() => beep(784, 0.12, 0.25), 200);
+            setTimeout(() => beep(1047, 0.12, 0.25), 300);
+            setTimeout(() => beep(1319, 0.12, 0.25), 400);
+            setTimeout(() => beep(1568, 0.4, 0.3), 500);
+        }
+        function playStar() { beep(1568, 0.15, 0.2); }
 
-                gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + duration);
+        // 背景音乐
+        const bgNotes = [330, 392, 440, 494, 523, 587, 659, 587];
+        let bgIndex = 0;
 
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
+        function playBgNote() {
+            if (!musicOn || !audioCtx) return;
+            beep(bgNotes[bgIndex], 0.25, 0.08);
+            bgIndex = (bgIndex + 1) % bgNotes.length;
+        }
 
-                oscillator.start(audioContext.currentTime);
-                oscillator.stop(audioContext.currentTime + duration);
-            } catch(e) {
-                console.log('音频播放失败:', e);
+        function startBgMusic() {
+            if (bgInterval) return;
+            bgIndex = 0;
+            playBgNote();
+            bgInterval = setInterval(playBgNote, 400);
+        }
+
+        function stopBgMusic() {
+            if (bgInterval) {
+                clearInterval(bgInterval);
+                bgInterval = null;
             }
         }
 
-        // ========== 音效函数 ==========
-
-        // 点击音效
-        function playClickSound() {
-            if (!audioContext) return;
-            playTone(1200, 0.05, 'sine', 0.15);
-        }
-
-        // 正确音效 - 三音和弦
-        function playCorrectSound() {
-            if (!audioContext) return;
-            // 同时播放三个音符组成和弦
-            playTone(523.25, 0.3, 'sine', 0.2);
-            playTone(659.25, 0.3, 'sine', 0.2);
-            playTone(783.99, 0.4, 'sine', 0.2);
-        }
-
-        // 错误音效 - 两个低音
-        function playWrongSound() {
-            if (!audioContext) return;
-            playTone(150, 0.25, 'sawtooth', 0.2);
-            setTimeout(() => {
-                if (audioContext) playTone(100, 0.3, 'sawtooth', 0.2);
-            }, 80);
-        }
-
-        // 开始音效
-        function playStartSound() {
-            if (!audioContext) return;
-            playTone(523.25, 0.1, 'sine', 0.25);
-            setTimeout(() => { if (audioContext) playTone(783.99, 0.1, 'sine', 0.25); }, 100);
-            setTimeout(() => { if (audioContext) playTone(1046.50, 0.3, 'sine', 0.25); }, 200);
-        }
-
-        // 胜利音效
-        function playWinSound() {
-            if (!audioContext) return;
-            playTone(523.25, 0.15, 'sine', 0.25);
-            setTimeout(() => { if (audioContext) playTone(659.25, 0.15, 'sine', 0.25); }, 120);
-            setTimeout(() => { if (audioContext) playTone(783.99, 0.15, 'sine', 0.25); }, 240);
-            setTimeout(() => { if (audioContext) playTone(1046.50, 0.2, 'sine', 0.25); }, 360);
-            setTimeout(() => { if (audioContext) playTone(1318.51, 0.25, 'sine', 0.25); }, 480);
-            setTimeout(() => { if (audioContext) playTone(1567.98, 0.5, 'sine', 0.3); }, 600);
-        }
-
-        // 星星音效
-        function playStarSound() {
-            if (!audioContext) return;
-            playTone(1567.98, 0.15, 'sine', 0.15);
-        }
-
-        // 简单背景音乐 - 单个音符循环
-        let bgNoteIndex = 0;
-        const bgNotes = [261.63, 329.63, 392, 523.25, 392, 329.63];
-        function playBackgroundNote() {
-            if (!musicEnabled) return;
-            playTone(bgNotes[bgNoteIndex], 0.3, 'sine', 0.08);
-            bgNoteIndex = (bgNoteIndex + 1) % bgNotes.length;
-
-            // 500ms 后播放下一个音符
-            backgroundMusicTimeout = setTimeout(playBackgroundNote, 500);
-        }
-
-        function stopBackgroundMusic() {
-            if (backgroundMusicTimeout) {
-                clearTimeout(backgroundMusicTimeout);
-                backgroundMusicTimeout = null;
-            }
-        }
-
-        function startBackgroundMusic() {
-            if (backgroundMusicTimeout) return;
-            bgNoteIndex = 0;
-            playBackgroundNote();
-        }
-
-        // 切换音乐开关
+        // 音乐开关
         document.getElementById('musicToggle').addEventListener('click', function() {
             initAudio();
-            musicEnabled = !musicEnabled;
-            this.textContent = musicEnabled ? '🎵' : '🔇';
-
-            if (musicEnabled && !document.getElementById('gameScreen').classList.contains('hidden')) {
-                startBackgroundMusic();
+            musicOn = !musicOn;
+            this.textContent = musicOn ? '🎵' : '🔇';
+            if (musicOn && !document.getElementById('gameScreen').classList.contains('hidden')) {
+                startBgMusic();
             } else {
-                stopBackgroundMusic();
+                stopBgMusic();
             }
         });
 
+        // 音效开关
+        document.getElementById('soundToggle').addEventListener('click', function() {
+            initAudio();
+            soundOn = !soundOn;
+            this.textContent = soundOn ? '🔊' : '🔇';
+        });
 
-        // ========== 游戏逻辑 ==========
+
+        // ===== 游戏逻辑 =====
         let state = {
             score: 0,
             currentQuestion: 0,
@@ -555,18 +561,23 @@
             }
         }
 
-        // 初始化音频（需要用户交互）
-        function initGameAudio() {
-            initAudio();
-            startBackgroundMusic();
-            playStartSound();
+        // 第一次交互时初始化音频
+        let audioInitialized = false;
+        function ensureAudioInit() {
+            if (!audioInitialized) {
+                initAudio();
+                audioInitialized = true;
+            }
         }
 
         let characterSelected = false;
 
         document.querySelectorAll('.character').forEach(char => {
-            char.addEventListener('click', () => {
-                initGameAudio(); // 用户交互后初始化音频
+            char.addEventListener('click', function() {
+                ensureAudioInit();
+                startBgMusic();
+                playStart();
+
                 document.querySelectorAll('.character').forEach(c => c.classList.remove('selected'));
                 char.classList.add('selected');
                 state.selectedCharacter = char.dataset.char;
@@ -578,8 +589,11 @@
             });
         });
 
-        document.getElementById('startBtn').addEventListener('click', () => {
-            initGameAudio(); // 用户交互后初始化音频
+        document.getElementById('startBtn').addEventListener('click', function() {
+            ensureAudioInit();
+            startBgMusic();
+            playStart();
+
             if (!state.selectedCharacter) {
                 state.selectedCharacter = '🐼';
             }
@@ -595,8 +609,6 @@
             state.currentQuestion = 0;
             state.correctCount = 0;
             state.wrongCount = 0;
-
-            bgNoteIndex = 0;
 
             updateDisplay();
             nextProblem();
@@ -632,11 +644,11 @@
             if (isCorrect) {
                 feedback.textContent = getRandomPraise();
                 feedback.className = 'feedback correct';
-                playCorrectSound();
+                playCorrect();
             } else {
                 feedback.textContent = `正确答案是 ${state.currentAnswer}`;
                 feedback.className = 'feedback wrong';
-                playWrongSound();
+                playWrong();
             }
 
             setTimeout(() => {
@@ -651,12 +663,11 @@
 
         // 数字键盘音效
         document.querySelectorAll('.num-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', function() {
                 const input = document.getElementById('answerInput');
-                const num = btn.dataset.num;
+                const num = this.dataset.num;
 
-                // 点击音效
-                playClickSound();
+                playClick();
 
                 if (num === 'clear') {
                     input.value = '';
@@ -669,8 +680,8 @@
         });
 
         // 确认按钮
-        document.getElementById('confirmBtn').addEventListener('click', () => {
-            playClickSound();
+        document.getElementById('confirmBtn').addEventListener('click', function() {
+            playClick();
             checkAnswer();
         });
 
@@ -700,18 +711,17 @@
         }
 
         function endGame() {
-            stopBackgroundMusic();
+            stopBgMusic();
 
-            // 播放星星音效
             for (let i = 0; i < 5; i++) {
                 setTimeout(() => {
-                    if (audioContext) playStarSound();
-                }, i * 150);
+                    if (i < 50) playStar();
+                }, i * 100);
             }
 
             setTimeout(() => {
-                if (audioContext) playWinSound();
-            }, 800);
+                playWin();
+            }, 600);
 
             document.getElementById('gameScreen').classList.add('hidden');
             document.getElementById('endScreen').classList.remove('hidden');
@@ -744,8 +754,8 @@
             document.getElementById('endMessage').textContent = messages[stars - 1];
         }
 
-        document.getElementById('restartBtn').addEventListener('click', () => {
-            startBackgroundMusic();
+        document.getElementById('restartBtn').addEventListener('click', function() {
+            startBgMusic();
             document.getElementById('endScreen').classList.add('hidden');
             document.getElementById('startScreen').classList.remove('hidden');
             document.querySelectorAll('.star').forEach(s => s.classList.remove('filled'));
