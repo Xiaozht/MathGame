@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>数学加法接力赛</title>
+    <style>
+        :root {
+            --primary-color: #FF6B9D;
+            --secondary-color: #4ECDC4;
+            --accent-color: #FFE66D;
+            --text-color: #2C3E50;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: 'Comic Sans MS', '微软雅黑', cursive;
+            background: linear-gradient(135deg, #FF9A9E 0%, #FECFEF 50%, #E0F7FA 100%);
+            min-height: 100vh;
+            padding: 10px;
+            overflow-x: hidden;
+        }
+
+        /* 漂浮的背景装饰 */
+        .floating-shapes {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .shape {
+            position: absolute;
+            font-size: 24px;
+            animation: float 6s ease-in-out infinite;
+            opacity: 0.3;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-30px) rotate(10deg); }
+        }
+
+        .game-container {
+            position: relative;
+            z-index: 1;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+            text-align: center;
+            max-width: 400px;
+            margin: 10px auto;
+            border: 3px solid var(--primary-color);
+        }
+
+        h1 {
+            color: var(--primary-color);
+            font-size: 1.4em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 0 var(--accent-color);
+        }
+
+        .start-screen, .game-screen, .end-screen {
+            transition: opacity 0.3s;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .character-select {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+
+        .character {
+            font-size: 45px;
+            padding: 10px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 3px solid transparent;
+            background: rgba(255,255,255,0.5);
+        }
+
+        .character:hover {
+            transform: scale(1.1);
+            border-color: var(--secondary-color);
+        }
+
+        .character:active {
+            transform: scale(0.95);
+        }
+
+        .character.selected {
+            border-color: var(--primary-color);
+            box-shadow: 0 5px 20px rgba(255,107,157,0.4);
+        }
+
+        .btn {
+            background: linear-gradient(45deg, var(--primary-color), #FF8A5B);
+            color: white;
+            border: none;
+            padding: 12px 40px;
+            font-size: 1.2em;
+            border-radius: 30px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.2s;
+            box-shadow: 0 3px 15px rgba(255,107,157,0.4);
+            display: inline-block;
+            margin: 8px 0;
+            min-width: 140px;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        #confirmBtn {
+            font-size: 1.5em;
+            padding: 15px 60px;
+            margin: 15px 0;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 3px 15px rgba(255,107,157,0.4); }
+            50% { transform: scale(1.05); box-shadow: 0 5px 25px rgba(255,107,157,0.6); }
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin: 10px 0;
+            font-size: 1em;
+        }
+
+        .stat-box {
+            background: linear-gradient(135deg, var(--secondary-color), #7DD9C5);
+            padding: 8px 15px;
+            border-radius: 10px;
+            color: white;
+            text-shadow: 1px 1px 0 rgba(0,0,0,0.1);
+        }
+
+        .problem {
+            font-size: 2em;
+            margin: 15px 0;
+            color: var(--text-color);
+            background: linear-gradient(135deg, var(--accent-color), #FFD93D);
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: inset 0 -3px 0 rgba(0,0,0,0.1);
+        }
+
+        .answer-input {
+            font-size: 1.5em;
+            padding: 10px;
+            width: 120px;
+            text-align: center;
+            border: 3px solid var(--secondary-color);
+            border-radius: 10px;
+            margin-top: 10px;
+            font-family: inherit;
+            outline: none;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #E0E0E0;
+            border-radius: 10px;
+            margin: 10px 0;
+            overflow: hidden;
+            box-shadow: inset 0 2px 3px rgba(0,0,0,0.1);
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--secondary-color), #4ECDC4);
+            transition: width 0.3s;
+            border-radius: 10px;
+        }
+
+        .feedback {
+            font-size: 1.2em;
+            margin: 10px 0;
+            min-height: 40px;
+        }
+
+        .feedback.correct {
+            color: #4CAF50;
+            animation: bounce 0.3s;
+        }
+
+        .feedback.wrong {
+            color: #F44336;
+            animation: shake 0.3s;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-8px); }
+            75% { transform: translateX(8px); }
+        }
+
+        .mascot {
+            font-size: 60px;
+            margin: 10px 0;
+            animation: wiggle 2s ease-in-out infinite;
+        }
+
+        @keyframes wiggle {
+            0%, 100% { transform: rotate(-5deg); }
+            50% { transform: rotate(5deg); }
+        }
+
+        .star-rating {
+            font-size: 35px;
+            margin: 10px 0;
+        }
+
+        .star {
+            opacity: 0.2;
+            transition: opacity 0.2s;
+        }
+
+        .star.filled {
+            opacity: 1;
+            animation: sparkle 0.3s;
+        }
+
+        @keyframes sparkle {
+            0% { transform: scale(0); }
+            50% { transform: scale(1.3); }
+            100% { transform: scale(1); }
+        }
+
+        .final-score {
+            font-size: 2.5em;
+            color: var(--primary-color);
+            margin: 10px 0;
+            text-shadow: 2px 2px 0 var(--accent-color);
+        }
+
+        .message {
+            font-size: 1.1em;
+            color: var(--text-color);
+            margin: 10px 0;
+        }
+
+        /* 数字键盘 */
+        .numpad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            max-width: 200px;
+            margin: 10px auto;
+        }
+
+        .num-btn {
+            font-size: 1.3em;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(135deg, var(--secondary-color), #7DD9C5);
+            color: white;
+            cursor: pointer;
+            transition: all 0.1s;
+            font-family: inherit;
+            touch-action: manipulation;
+        }
+
+        .num-btn:active {
+            transform: scale(0.9);
+        }
+
+        .num-btn.clear {
+            background: #FF6B6B;
+        }
+    </style>
+</head>
+<body>
+    <div class="floating-shapes" id="shapes"></div>
+
+    <div class="game-container">
+        <!-- 开始屏幕 -->
+        <div class="start-screen" id="startScreen">
+            <h1>🎓 数学加法接力赛 🏃</h1>
+            <div class="mascot">🐼</div>
+            <p style="font-size: 1em; color: #666; margin: 10px 0;">
+                选出你的小伙伴，一起挑战！
+            </p>
+            <p style="color: #999; margin-bottom: 10px;">选择角色：</p>
+            <div class="character-select">
+                <div class="character" data-char="🐼">🐼</div>
+                <div class="character" data-char="🐰">🐰</div>
+                <div class="character" data-char="🦊">🦊</div>
+                <div class="character" data-char="🐱">🐱</div>
+                <div class="character" data-char="🐨">🐨</div>
+                <div class="character" data-char="🦄">🦄</div>
+            </div>
+            <button class="btn" id="startBtn">开始！</button>
+        </div>
+
+        <!-- 游戏屏幕 -->
+        <div class="game-screen hidden" id="gameScreen">
+            <div class="mascot" id="gameMascot"></div>
+            <div class="stats">
+                <div class="stat-box">⭐ <span id="score">0</span></div>
+                <div class="stat-box">📝 <span id="qNum">1</span>/5</div>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress"></div>
+            </div>
+            <div class="problem" id="problem"></div>
+            <input type="number" class="answer-input" id="answerInput" placeholder="？" readonly>
+
+            <div class="numpad">
+                <button class="num-btn" data-num="1">1</button>
+                <button class="num-btn" data-num="2">2</button>
+                <button class="num-btn" data-num="3">3</button>
+                <button class="num-btn" data-num="4">4</button>
+                <button class="num-btn" data-num="5">5</button>
+                <button class="num-btn" data-num="6">6</button>
+                <button class="num-btn" data-num="7">7</button>
+                <button class="num-btn" data-num="8">8</button>
+                <button class="num-btn" data-num="9">9</button>
+                <button class="num-btn clear" data-num="clear">C</button>
+                <button class="num-btn" data-num="0">0</button>
+            </div>
+
+            <button class="btn" id="confirmBtn">确认！</button>
+
+            <div class="feedback" id="feedback"></div>
+        </div>
+
+        <!-- 结束屏幕 -->
+        <div class="end-screen hidden" id="endScreen">
+            <h1>🎉 完成！</h1>
+            <div class="mascot" id="endMascot"></div>
+            <div class="star-rating" id="starRating">
+                <span class="star" data-star="1">⭐</span>
+                <span class="star" data-star="2">⭐</span>
+                <span class="star" data-star="3">⭐</span>
+                <span class="star" data-star="4">⭐</span>
+                <span class="star" data-star="5">⭐</span>
+            </div>
+            <div class="final-score">🏆 <span id="finalScore">0</span></div>
+            <div class="message" id="endMessage"></div>
+            <div style="margin: 20px 0;">
+                <p style="font-size: 1em;">对 <span id="correctCount" style="color: #4CAF50; font-weight: bold;">0</span> ❌错 <span id="wrongCount" style="color: #F44336; font-weight: bold;">0</span></p>
+            </div>
+            <button class="btn" id="restartBtn">再玩一次！</button>
+        </div>
+    </div>
+
+    <script>
+        // 游戏状态
+        let state = {
+            score: 0,
+            currentQuestion: 0,
+            totalQuestions: 5,
+            currentAnswer: 0,
+            selectedCharacter: '🐼',
+            correctCount: 0,
+            wrongCount: 0
+        };
+
+        // 漂浮装饰元素
+        const shapes = ['+', '☆', '⭐', '🎈', '🌸', '🍭', '🎵', '✨'];
+
+        function createFloatingShapes() {
+            const container = document.getElementById('shapes');
+            for (let i = 0; i < 10; i++) {
+                const shape = document.createElement('div');
+                shape.className = 'shape';
+                shape.textContent = shapes[Math.floor(Math.random() * shapes.length)];
+                shape.style.left = Math.random() * 100 + '%';
+                shape.style.top = Math.random() * 100 + '%';
+                shape.style.animationDelay = Math.random() * 6 + 's';
+                container.appendChild(shape);
+            }
+        }
+
+        let characterSelected = false;
+
+        // 角色选择
+        document.querySelectorAll('.character').forEach(char => {
+            char.addEventListener('click', () => {
+                document.querySelectorAll('.character').forEach(c => c.classList.remove('selected'));
+                char.classList.add('selected');
+                state.selectedCharacter = char.dataset.char;
+                characterSelected = true;
+
+                setTimeout(() => {
+                    startGame();
+                }, 300);
+            });
+        });
+
+        // 开始按钮
+        document.getElementById('startBtn').addEventListener('click', () => {
+            if (!state.selectedCharacter) {
+                state.selectedCharacter = '🐼';
+            }
+            startGame();
+        });
+
+        // 开始游戏
+        function startGame() {
+            document.getElementById('startScreen').classList.add('hidden');
+            document.getElementById('gameScreen').classList.remove('hidden');
+            document.getElementById('gameMascot').textContent = state.selectedCharacter;
+
+            state.score = 0;
+            state.currentQuestion = 0;
+            state.correctCount = 0;
+            state.wrongCount = 0;
+
+            updateDisplay();
+            nextProblem();
+        }
+
+        // 生成新题目
+        function nextProblem() {
+            if (state.currentQuestion >= state.totalQuestions) {
+                endGame();
+                return;
+            }
+
+            let maxNum = state.currentQuestion < 3 ? 20 : 30;
+            let num1 = Math.floor(Math.random() * maxNum) + 1;
+            let num2 = Math.floor(Math.random() * maxNum) + 1;
+
+            if (num1 + num2 > 100) {
+                num2 = 100 - num1;
+            }
+
+            state.currentAnswer = num1 + num2;
+            document.getElementById('problem').textContent = `${num1} + ${num2} = ?`;
+            document.getElementById('answerInput').value = '';
+        }
+
+        // 更新显示
+        function updateDisplay() {
+            document.getElementById('score').textContent = state.score;
+            document.getElementById('qNum').textContent = state.currentQuestion + 1;
+            document.getElementById('progress').style.width = ((state.currentQuestion + 1) / state.totalQuestions * 100) + '%';
+        }
+
+        // 反馈显示
+        function showFeedback(isCorrect) {
+            const feedback = document.getElementById('feedback');
+            if (isCorrect) {
+                feedback.textContent = getRandomPraise();
+                feedback.className = 'feedback correct';
+            } else {
+                feedback.textContent = `正确答案是 ${state.currentAnswer}`;
+                feedback.className = 'feedback wrong';
+            }
+
+            setTimeout(() => {
+                feedback.textContent = '';
+            }, 1200);
+        }
+
+        // 随机表扬语
+        function getRandomPraise() {
+            const praises = ['🎉 太棒啦！', '✨ 好聪明！', '🌟 答对了！', '💪 真厉害！', '🏆 完美！'];
+            return praises[Math.floor(Math.random() * praises.length)];
+        }
+
+        // 数字键盘
+        document.querySelectorAll('.num-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const input = document.getElementById('answerInput');
+                const num = btn.dataset.num;
+
+                if (num === 'clear') {
+                    input.value = '';
+                } else {
+                    if (input.value.length < 3) {
+                        input.value += num;
+                    }
+                }
+            });
+        });
+
+        // 确认按钮
+        document.getElementById('confirmBtn').addEventListener('click', checkAnswer);
+
+        // 检查答案
+        function checkAnswer() {
+            const input = document.getElementById('answerInput');
+            const answer = parseInt(input.value);
+
+            if (!input.value || isNaN(answer)) {
+                return;
+            }
+
+            if (answer === state.currentAnswer) {
+                state.score += 20;
+                state.correctCount++;
+                showFeedback(true);
+            } else {
+                state.wrongCount++;
+                showFeedback(false);
+            }
+
+            state.currentQuestion++;
+            updateDisplay();
+
+            setTimeout(() => {
+                nextProblem();
+            }, 800);
+        }
+
+        // 结束游戏
+        function endGame() {
+            document.getElementById('gameScreen').classList.add('hidden');
+            document.getElementById('endScreen').classList.remove('hidden');
+            document.getElementById('endMascot').textContent = state.selectedCharacter;
+            document.getElementById('finalScore').textContent = state.score;
+            document.getElementById('correctCount').textContent = state.correctCount;
+            document.getElementById('wrongCount').textContent = state.wrongCount;
+
+            let stars = 1;
+            if (state.correctCount >= 5) stars = 5;
+            else if (state.correctCount >= 4) stars = 4;
+            else if (state.correctCount >= 3) stars = 3;
+            else if (state.correctCount >= 2) stars = 2;
+
+            document.querySelectorAll('.star').forEach((star, index) => {
+                if (index < stars) {
+                    setTimeout(() => {
+                        star.classList.add('filled');
+                    }, index * 200);
+                }
+            });
+
+            const messages = [
+                '加油，继续练习！💪',
+                '不错哦，继续！👍',
+                '你是数学小天才！🌟',
+                '太厉害了！🏆',
+                '完美！数学大师！✨'
+            ];
+            document.getElementById('endMessage').textContent = messages[stars - 1];
+        }
+
+        // 重新开始
+        document.getElementById('restartBtn').addEventListener('click', () => {
+            document.getElementById('endScreen').classList.add('hidden');
+            document.getElementById('startScreen').classList.remove('hidden');
+            document.querySelectorAll('.star').forEach(s => s.classList.remove('filled'));
+        });
+
+        // 初始化
+        createFloatingShapes();
+    </script>
+</body>
+</html>
